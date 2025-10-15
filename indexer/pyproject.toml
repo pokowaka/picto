@@ -1,0 +1,13 @@
+[project]
+name = "picto-indexer"
+version = "0.1.0"
+description = "A tool to scan and enrich pictograms using an AI."
+dependencies = [
+    "google-generativeai",
+    "tqdm",
+    "rich",
+    "Pillow"
+]
+
+[project.scripts]
+build-picto-index = "picto_indexer.cli:main"
