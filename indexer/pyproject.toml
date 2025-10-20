@@ -8,7 +8,7 @@ dependencies = [
     "rich",
     "Pillow",
     "sentence-transformers",
-    "faiss-cpu",
+    "chromadb",
     "numpy"
 ]
 

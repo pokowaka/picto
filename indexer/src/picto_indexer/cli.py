@@ -1,5 +1,5 @@
 """
-The command-line interface for the Picto Indexer.
+Command-line interface for the Picto Indexer.
 """
 import argparse
 import logging
@@ -9,7 +9,6 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 
 from . import enricher, vectorizer
 from . import file_io
-# from .exceptions import PictoIndexerError
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')

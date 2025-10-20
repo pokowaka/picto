@@ -14,7 +14,7 @@ def test_cli_enrich_command(mocker):
 
     # Assert that an Enricher was instantiated with the correct model
     mock_enricher_class.assert_called_once_with(model_name='test-model')
-    
+
     # Assert that the run method was called with the correct, resolved paths
     run_args = mock_instance.run.call_args[0]
     expected_image_dir = Path('/tmp/images').resolve()
@@ -44,7 +44,7 @@ def test_cli_run_command(mocker):
     """Tests that the 'run' subcommand calls both the Enricher and Vectorizer."""
     mock_enricher_class = mocker.patch('picto_indexer.enricher.Enricher')
     mock_vectorizer_class = mocker.patch('picto_indexer.vectorizer.Vectorizer')
-    
+
     mock_enricher_instance = mock_enricher_class.return_value
     mock_vectorizer_instance = mock_vectorizer_class.return_value
 
@@ -59,7 +59,7 @@ def test_cli_run_command(mocker):
     # Assert that both classes were instantiated and their run methods were called
     mock_enricher_class.assert_called_once()
     mock_enricher_instance.run.assert_called_once()
-    
+
     mock_vectorizer_class.assert_called_once()
     mock_vectorizer_instance.run.assert_called_once()
 

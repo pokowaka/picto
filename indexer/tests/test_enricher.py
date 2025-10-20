@@ -36,22 +36,22 @@ def test_enricher_run_processes_new_images(enricher_instance, tmp_path, mocker):
     (image_dir / "image3.png").touch()
 
     output_file = tmp_path / "db.json"
-    
+
     # Mock existing data: image1 is already processed
     existing_data = {"image1": {"tags": [], "description": ""}}
-    
+
     # Mock file_io functions
     mocker.patch('picto_indexer.file_io.load_enrichment_data', return_value=existing_data)
     mock_save = mocker.patch('picto_indexer.file_io.save_enrichment_data')
     mocker.patch('picto_indexer.file_io.read_image', return_value=MagicMock()) # Mock image reading
-    
+
     mock_progress = MagicMock()
 
     # --- Execution ---
     enricher_instance.run(image_dir, output_file, mock_progress)
 
     # --- Assertions ---
-    
+
     # 1. Assert that the Gemini model was called exactly twice (for image2 and image3)
     assert enricher_instance.model.generate_content.call_count == 2
 
@@ -87,21 +87,21 @@ def test_enricher_handles_api_failure(enricher_instance, tmp_path, mocker):
             response = MagicMock()
             response.text = '{"tags": ["good"], "description": "good image"}'
             return response
-            
+
     enricher_instance.model.generate_content.side_effect = side_effect
 
     mocker.patch('picto_indexer.file_io.load_enrichment_data', return_value={})
     mock_save = mocker.patch('picto_indexer.file_io.save_enrichment_data')
     mocker.patch('picto_indexer.file_io.read_image', return_value=MagicMock())
     mocker.patch('time.sleep') # Prevent sleeping during tests
-    
+
     mock_progress = MagicMock()
 
     # --- Execution ---
     enricher_instance.run(image_dir, output_file, mock_progress)
 
     # --- Assertions ---
-    
+
     # 1. Assert the model was called for both images (with retries for the bad one)
     assert enricher_instance.model.generate_content.call_count == 1 + 3 # 1 for good, 3 for bad
 

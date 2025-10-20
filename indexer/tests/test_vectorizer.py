@@ -25,6 +25,7 @@ def vectorizer_instance(mocker, mock_sbert_model):
 def test_clean_text(vectorizer_instance):
     """Tests the text cleaning and normalization."""
     assert vectorizer_instance._clean_text("Auto Wassen!") == "auto wassen"
+    # Corrected assertion: numbers should be preserved
     assert vectorizer_instance._clean_text("tanden-poetsen_123") == "tandenpoetsen123"
     assert vectorizer_instance._clean_text("  leading/trailing spaces  ") == "  leadingtrailing spaces  "
 
@@ -52,7 +53,7 @@ def test_vectorizer_run(vectorizer_instance, tmp_path, mocker):
     input_file.write_text(str(mock_input_content).replace("'", '"'))
 
     output_dir = tmp_path / "output"
-    
+
     # Mock the file_io functions
     mock_save = mocker.patch('picto_indexer.file_io.save_final_artifacts')
     mock_progress = MagicMock()
@@ -61,10 +62,10 @@ def test_vectorizer_run(vectorizer_instance, tmp_path, mocker):
     vectorizer_instance.run(input_file, output_dir, mock_progress)
 
     # --- Assertions ---
-    
+
     # 1. Assert that the SBERT model's encode method was called
     vectorizer_instance.model.encode.assert_called_once()
-    
+
     # 2. Check the content that was passed to the encode method
     call_args = vectorizer_instance.model.encode.call_args[0][0]
     assert len(call_args) == 2 # ongeldig-record should be skipped
@@ -83,7 +84,7 @@ def test_vectorizer_run(vectorizer_instance, tmp_path, mocker):
     assert "auto wassen" in saved_data
     assert "ongeldig-record" not in saved_data
     assert saved_data["tanden poetsen"]["concept_nl"] == "tanden poetsen"
-    
+
     assert isinstance(saved_vectors, np.ndarray)
     assert saved_vectors.shape == (2, 3)
     assert saved_vectors.dtype == 'float32'

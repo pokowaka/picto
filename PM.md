@@ -88,11 +88,9 @@ The V1.0 system is a three-stage pipeline.
 #### 4.2. Stage 2: The "Retriever" (Deterministic SBERT)
 
 * **Task:** Receives the `search_query` strings from the LLM's JSON output.
-* **Technology:** A Sentence-BERT (SBERT) model (e.g., `distiluse-base-multilingual-cased-v1`).
-* **Vector Database:** `FAISS` (Facebook AI Similarity Search).
-  * **Vector Normalization:** All 512d vectors (from database and query) will be **L2-normalized**.
-  * **Index:** `FAISS IndexFlatL2`.
-* **Process:** For each `search_query`, the Retriever performs a $k$-Nearest Neighbor search ($k=3$) against the `FAISS` index.
+* **Technology:** A Sentence-BERT (SBERT) model (`all-mpnet-base-v2`).
+* **Vector Database:** `ChromaDB`.
+* **Process:** For each `search_query`, the Retriever performs a $k$-Nearest Neighbor search ($k=3$) against the `ChromaDB` index.
 
 #### 4.3. Stage 3: The "Curator" (Creator UI)
 
@@ -113,7 +111,7 @@ The system must be robust to failure in each stage.
   * **Logic:** The application JSON parser fails. The system will *not* retry (to avoid a deterministic failure loop).
   * **UI Feedback:** Display a modal: "Error: The AI Planner returned a malformed response. We are working on it. Please try a different goal." (Log the malformed response for engineering review.)
 * **Stage 2 (Retriever) Failure:**
-  * **Error:** A `search_query` from the LLM yields zero relevant results from SBERT/FAISS (i.e., the Top-1 result has a similarity score below a pre-defined threshold, e.g., 0.3).
+  * **Error:** A `search_query` from the LLM yields zero relevant results from SBERT/ChromaDB (i.e., the Top-1 result has a similarity score below a pre-defined threshold, e.g., 0.3).
   * **Logic:** Do not fail the entire sequence.
   * **UI Feedback:** The UI will render the `step_name` (e.g., "Glargle the Flanz") with a "missing pictogram" placeholder (e.g., a query-mark icon). This makes the failure *visible and editable* by the Creator, who can then delete the step.
 
@@ -177,15 +175,15 @@ This section explains the technical terms used in this document for non-expert s
 
 * **Vector (or Embedding):** A vector is a mathematical representation of meaning. Sentences with similar meanings will have similar vectors. For example, the vector for "put on coat" will be mathematically very close to the vector for "wear jacket," but very far from the vector for "eat breakfast."
 
-* **FAISS (Facebook AI Similarity Search):** This is our "Vector Database." It's a highly efficient library that stores the vectors for *every single pictogram* in our database.
+* **ChromaDB:** This is our "Vector Database." It's a modern, open-source embedding database that stores the vectors for *every single pictogram* in our database and allows for very fast and efficient searching.
 
 * **Vector Search (or Semantic Search):** This is the core process of the "Retriever."
     1. The LLM gives us a `search_query` (e.g., "put on clothes").
     2. SBERT turns this query into a **query vector**.
-    3. We use `FAISS` to instantly compare this **query vector** against all the pictogram vectors in our database.
-    4. `FAISS` returns the Top 3 pictograms whose vectors are mathematically *closest* in meaning to the query vector. This is how we find the "put on clothes" pictogram without the LLM needing to know it exists.
+    3. We use `ChromaDB` to instantly compare this **query vector** against all the pictogram vectors in our database.
+    4. `ChromaDB` returns the Top 3 pictograms whose vectors are mathematically *closest* in meaning to the query vector. This is how we find the "put on clothes" pictogram without the LLM needing to know it exists.
 
-* **Hybrid Model:** Our term for combining the "Planner" (LLM) and the "Retriever" (SBERT/FAISS). The LLM *plans* the steps, and the Retriever *finds* the matching items. This gives us the common sense of an LLM while ensuring the results are deterministic and grounded in our actual database.
+* **Hybrid Model:** Our term for combining the "Planner" (LLM) and the "Retriever" (SBERT/ChromaDB). The LLM *plans* the steps, and the Retriever *finds* the matching items. This gives us the common sense of an LLM while ensuring the results are deterministic and grounded in our actual database.
 
 * **P95 Latency:** A performance metric. It means that 95% of all requests must be *faster* than the target time. A P95 latency of < 5.0 seconds means 95 out of 100 users will get a response in under 5 seconds, which is a strong measure of reliability.
 

@@ -10,7 +10,6 @@ from PIL import Image
 from pathlib import Path
 from rich.progress import Progress
 
-# from .exceptions import APIError, ConfigurationError
 from . import file_io
 
 log = logging.getLogger(__name__)
@@ -38,11 +37,9 @@ Example Output Format for an image of a car being washed with filename "auto was
         try:
             api_key = os.environ["GEMINI_API_KEY"]
             if not api_key:
-                # raise ConfigurationError("The GEMINI_API_KEY environment variable is set but empty.")
                 raise ValueError("The GEMINI_API_KEY environment variable is set but empty.")
             genai.configure(api_key=api_key)
         except KeyError:
-            # raise ConfigurationError("The GEMINI_API_KEY environment variable is not set.")
             raise KeyError("The GEMINI_API_KEY environment variable is not set.")
 
     def _discover_model(self) -> str:
@@ -53,7 +50,6 @@ Example Output Format for an image of a car being washed with filename "auto was
                 if 'flash' in m.name:
                     log.info("Found Flash model: %s", m.name)
                     return m.name
-        # raise APIError("Could not discover a suitable Gemini vision model (Flash).")
         raise ConnectionError("Could not discover a suitable Gemini vision model (Flash).")
 
     def _get_enrichment_for_image(self, base_text: str, image: Image.Image, retries: int = 3, delay: int = 5) -> dict | None:
@@ -105,6 +101,8 @@ Example Output Format for an image of a car being washed with filename "auto was
                 enriched_data = self._get_enrichment_for_image(base_text, image)
 
                 if enriched_data:
+                    # Add image_path to the enriched data
+                    enriched_data["image_path"] = str(Path("img") / "nl" / image_path.name)
                     existing_data[base_text] = enriched_data
                     # Save after each successful enrichment for resumability
                     file_io.save_enrichment_data(existing_data, output_file)
