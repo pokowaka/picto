@@ -1,13 +1,22 @@
 [project]
 name = "picto-indexer"
-version = "0.1.0"
-description = "A tool to scan and enrich pictograms using an AI."
+version = "0.3.0"
+description = "A tool to enrich pictograms and build a vector search index."
 dependencies = [
     "google-generativeai",
     "tqdm",
     "rich",
-    "Pillow"
+    "Pillow",
+    "sentence-transformers",
+    "faiss-cpu",
+    "numpy"
 ]
 
 [project.scripts]
 build-picto-index = "picto_indexer.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-mock"
+]

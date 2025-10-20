@@ -1,14 +1,16 @@
-# Picto Indexer - Design Document
+# Picto Indexer - Design Document (V3)
 
-This document outlines the design for the `indexer` subproject. Its sole purpose is to scan the pictogram image directories, enrich the data using the Google Gemini API's **multimodal capabilities**, and produce a structured `pictogram_index.json` file in the project's root directory.
+This document outlines the expanded design for the `indexer` subproject. Its purpose is now twofold:
+1.  To scan pictogram image directories and **enrich** the data using the Google Gemini API's multimodal capabilities.
+2.  To process this enriched data, **vectorize** it using a Sentence-BERT (SBERT) model, and produce a FAISS index for semantic search.
 
-This will be a modern, installable Python package managed with `pyproject.toml`.
+The indexer is the sole tool responsible for the entire data preparation pipeline, creating the final artifacts required by the backend service.
 
 ---
 
 ## 1. Project Structure
 
-The `indexer` directory will be structured as a standard Python package. This allows for clean dependency management and makes the tool easy to run via a command-line script.
+The project will use a modular structure to separate concerns. The `cli.py` module will act as the main entry point, dispatching tasks to the other modules.
 
 ```
 /picto/
@@ -17,122 +19,120 @@ The `indexer` directory will be structured as a standard Python package. This al
 │   └── src/
 │       └── picto_indexer/
 │           ├── __init__.py
-│           └── build.py
+│           ├── cli.py           # Main entry point, handles subcommands (enrich, vectorize, run)
+│           ├── enricher.py      # Logic for Gemini API calls
+│           ├── vectorizer.py    # Logic for SBERT/FAISS index generation
+│           └── file_io.py       # Utilities for reading/writing files
 │
-└── img/
-    └── nl/
-        └── ...
+└── ...
 ```
-
-- **`pyproject.toml`**: Defines project metadata, dependencies, and the command-line entry point.
-- **`src/picto_indexer/`**: The source code for our installable package.
-  - **`build.py`**: The main script containing all logic for scanning files, **reading image data**, calling the AI, and writing the output.
 
 ---
 
 ## 2. Dependency and Package Management (`pyproject.toml`)
 
-We will use a `pyproject.toml` file to define the project. This is the modern standard for Python packaging.
+The dependencies will be updated to include the libraries required for vectorization.
 
 **`pyproject.toml` Content:**
 
 ```toml
 [project]
 name = "picto-indexer"
-version = "0.1.0"
-description = "A tool to scan and enrich pictograms using an AI."
+version = "0.3.0"
+description = "A tool to enrich pictograms and build a vector search index."
 dependencies = [
     "google-generativeai",
     "tqdm",
     "rich",
-    "Pillow"
+    "Pillow",
+    "sentence-transformers",
+    "faiss-cpu",
+    "numpy"
 ]
 
 [project.scripts]
-build-picto-index = "picto_indexer.build:main"
+build-picto-index = "picto_indexer.cli:main"
 ```
 
-- **Dependencies:**
-  - `google-generativeai`: The official SDK for the Gemini API.
-  - `tqdm`: To provide a progress bar during the indexing process.
-  - `rich`: For clean and readable console output.
-  - **`Pillow`**: The Python Imaging Library, required for opening and handling image data to pass to the Gemini API.
-- **`[project.scripts]`**: This section creates a command-line tool. After installing the package, we can simply run `build-picto-index` from the terminal to execute the `main` function in our `build.py` script.
+- **New/Specified Dependencies:**
+  - `sentence-transformers`: For loading SBERT models and encoding text.
+  - `faiss-cpu`: For creating and saving the FAISS vector index.
+  - `numpy`: A core dependency for `faiss-cpu`, used for handling the vector arrays.
 
 ---
 
-## 3. Indexing Workflow (`build.py`)
+## 3. Indexing Workflow
 
-The `build.py` script will be the heart of the indexer.
+The `indexer` operates as a two-stage pipeline. The CLI provides the flexibility to run each stage independently or both in sequence.
 
-**1. Configuration:**
-   - Constants will be defined at the top of the file for input directory (`img/nl`), output file (`pictogram_index.json` in the project root), and a list of sample files to process.
+### Stage 1: Enrichment
 
-**2. Core Functions:**
-   - **`get_gemini_enrichment(text_prompt: str, image: Image) -> dict | None`**:
-     - Takes a Dutch phrase (from the filename) and a Pillow `Image` object as input.
-     - **Constructs a multimodal prompt:** This will be a list containing both the text instructions and the image object.
-     - Handles the API call to a multimodal model (Gemini 1.5 Flash), including error handling.
-     - Uses the `rich` library to print clean error messages.
-     - Returns a dictionary with the enriched data or `None` on failure.
-   - **`main()`**:
-     - This is the main entry point for the script.
-     - It will use `pathlib` to locate the source image directory and the root directory for the output file.
-     - It will iterate through the configured list of sample pictogram files.
-     - For each file:
-       - It will **open the image file using Pillow**.
-       - It will extract the base text from the filename.
-       - It will call `get_gemini_enrichment()` with both the text and the image object.
-     - It will use `tqdm` to show a progress bar for the loop.
-     - It will assemble the final list of enriched pictogram objects.
-     - Finally, it will write the complete list to `pictogram_index.json` in the project root.
+-   **Responsibility:** Generate AI-enriched data from raw images.
+-   **Module:** `enricher.py`
+-   **Input:** A directory of `.png` image files.
+-   **Process:**
+    1.  Scans the input directory for images that are not already present in the output file (resumable).
+    2.  For each new image, it uses a multimodal call to the Gemini API.
+-   **Output:** A single JSON file (`db.json` by default) containing the raw enriched data.
 
-**3. AI Prompt Design (Multimodal):**
-   - The prompt will be engineered to instruct the AI to analyze the visual content of the image first and foremost, using the filename as a contextual hint.
+### Stage 2: Vectorization
 
-   **Example Multimodal Prompt:**
-   ```python
-   # This is a conceptual example of the list passed to the API
-   [
-       """
-       You are an expert data enricher for a pictogram system. Your task is to analyze the provided image and generate metadata for it. The image's filename, which is "{base_text}", is a hint in Dutch for the primary action depicted.
-
-       Return a single, minified JSON object (no newlines) with the following exact structure:
-       - "translations": An object with keys for "en", "fr", and "de".
-       - "tags": An array of 5-7 relevant English keywords, in lowercase, that categorize the action.
-       - "description": A concise, objective sentence in English describing the action shown in the pictogram.
-       """,
-       image_object  # The actual Pillow Image object
-   ]
-   ```
+-   **Responsibility:** Transform the raw data into final, searchable artifacts.
+-   **Module:** `vectorizer.py`
+-   **Input:** The raw enriched JSON file from Stage 1.
+-   **Process & Technical Details:**
+    1.  **Load & Validate Data:** Reads the raw JSON data. Each record is validated to ensure it contains the required fields (e.g., `description`, `tags`) before processing. Malformed records are skipped and reported to the user.
+    2.  **Transform Schema:** Transforms the schema to match the `PM.md` specification (adding `id`, `concept_nl`, etc.).
+    3.  **Clean & Combine Text:** For each pictogram, it creates a composite `embedding_text` by cleaning (lowercase, remove special characters) and combining the `concept_nl`, `description_nl`, and `tags_nl` fields.
+    4.  **Generate Vectors:**
+        *   Loads the SBERT model using `sentence_transformers.SentenceTransformer('distiluse-base-multilingual-cased-v1')`.
+        *   Encodes the list of `embedding_text` strings into a list of 512-dimension vectors. The output is a `numpy.ndarray`.
+    5.  **Build & Save Index:**
+        *   Initializes a FAISS index using `faiss.IndexFlatL2(d)`, where `d` is the vector dimension (512). This index performs an exact, exhaustive search.
+        *   Adds the `numpy` array of vectors to the index.
+        *   Serializes and saves the index to a binary file using `faiss.write_index()`.
+-   **Output:** Two artifact files:
+    1.  `pictogram_data.json`: The cleaned, transformed metadata.
+    2.  `faiss_index.bin`: The binary FAISS index file.
 
 ---
 
 ## 4. Usage
 
-To run the indexer:
+The command-line interface is designed for flexibility, allowing the user to run each stage of the pipeline independently or sequentially. All file paths provided by the user will be resolved to absolute paths internally to ensure reliability.
 
-1.  **Navigate to the directory:**
-    ```bash
-    cd /path/to/picto/indexer
-    ```
-2.  **Install the package (or update):**
-    ```bash
-    pip install -e .
-    ```
-3.  **Set the API Key:**
-    ```bash
-    export GEMINI_API_KEY="your_api_key_here"
-    ```
-4.  **Run the indexer:**
-    - **To use auto-discovery (recommended):**
-      ```bash
-      build-picto-index
-      ```
-    - **To specify a model (e.g., for cost savings):**
-      Use the `--model` flag.
-      ```bash
-      build-picto-index --model models/gemini-1.5-flash-latest
-      ```
+### 4.1. Subcommand Structure
 
-This revised design ensures the AI's analysis is based on the actual visual data, leading to a much more accurate and powerful indexing system.
+The tool uses three subcommands:
+
+*   `enrich`: Runs only the Gemini data enrichment stage.
+*   `vectorize`: Runs only the SBERT/FAISS vectorization stage.
+*   `run`: Runs the full pipeline (enrich then vectorize) in a single command.
+
+### 4.2. Examples
+
+**1. Run only the enrichment stage:**
+(Useful for the initial, expensive API calls)
+```bash
+build-picto-index enrich \
+  --image-dir ../img/nl \
+  --output-file ./db.json
+```
+
+**2. Run only the vectorization stage:**
+(Useful for re-generating the index with a new model or logic without re-running enrichment)
+```bash
+build-picto-index vectorize \
+  --input-file ./db.json \
+  --output-dir ../backend/data
+```
+
+**3. Run the full, end-to-end pipeline:**
+(Convenience command for the most common use case)
+```bash
+build-picto-index run \
+  --image-dir ../img/nl \
+  --raw-output-file ./db.json \
+  --final-output-dir ../backend/data
+```
+This revised command structure provides the necessary flexibility for both development and production workflows, addressing the need to run stages independently for experimentation, debugging, or recovery.

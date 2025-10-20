@@ -1,0 +1,13 @@
+{
+  "auto wassen": {
+    "tags": ["auto", "wassen", "schoonmaken", "water", "voertuig", "taak"],
+    "description": "Een persoon wast de buitenkant van een auto met zeep en water."
+  },
+  "tanden poetsen": {
+    "tags": ["tanden", "poetsen", "tandenborstel", "hygiëne", "badkamer", "ochtendroutine"],
+    "description": "Een persoon poetst zijn tanden met een tandenborstel en tandpasta."
+  },
+  "ongeldig-record": {
+    "msg": "Dit record is ongeldig en mist de vereiste velden."
+  }
+}
